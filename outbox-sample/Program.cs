@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using outbox_sample.Database;
+
 namespace outbox_sample;
 
 public class Program
@@ -12,7 +15,12 @@ public class Program
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
+        
+        builder.Services.AddDbContext<AppDbContext>(options =>
+            options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
 
+        builder.Services.AddScoped<DatabaseInitializer>();
+        
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.
@@ -26,6 +34,14 @@ public class Program
 
         app.UseAuthorization();
 
+        using (var scope = app.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var sqlScript = File.ReadAllText("../Scripts/init.sql");
+            dbContext.Database.ExecuteSqlRaw(sqlScript);
+        }
+
+        
         var summaries = new[]
         {
             "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
