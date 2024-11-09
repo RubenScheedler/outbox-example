@@ -6,3 +6,10 @@
      processed_at TIMESTAMP WITH TIME ZONE NULL,
      error TEXT NULL
 );
+
+CREATE TABLE IF NOT EXISTS orders(
+    id UUID PRIMARY KEY,
+    placed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    customer_id UUID NOT NULL,
+    product_id UUID NOT NULL
+)

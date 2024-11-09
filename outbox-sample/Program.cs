@@ -1,5 +1,11 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using outbox_sample.Database;
+using outbox_sample.Messaging;
+using outbox_sample.Messaging.Abstraction;
+using outbox_sample.Orders;
+using outbox_sample.Orders.Abstraction;
+using outbox_sample.Outbox.Abstraction;
 
 namespace outbox_sample;
 
@@ -15,14 +21,26 @@ public class Program
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
-        
+
         builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
+            options
+                .UseNpgsql(builder.Configuration.GetConnectionString("Postgres"))
+                .UseSnakeCaseNamingConvention()
+            );
 
         builder.Services.AddScoped<DatabaseInitializer>();
-        
+        builder.Services.AddScoped<IMessageBroker, MessageBroker>();
+        builder.Services.AddScoped<IOutbox, Outbox.Outbox>();
+        builder.Services.AddScoped<IPlaceOrderHandler, PlaceOrderHandler>();
         var app = builder.Build();
 
+        using (var scope = app.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var sqlScript = File.ReadAllText("../Scripts/init.sql");
+            dbContext.Database.ExecuteSqlRaw(sqlScript);
+        }
+        
         // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
         {
@@ -34,32 +52,11 @@ public class Program
 
         app.UseAuthorization();
 
-        using (var scope = app.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var sqlScript = File.ReadAllText("../Scripts/init.sql");
-            dbContext.Database.ExecuteSqlRaw(sqlScript);
-        }
-
-        
-        var summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
-        app.MapGet("/weatherforecast", (HttpContext httpContext) =>
+        app.MapPost("/place-order", (HttpContext _, PlaceOrder command, [FromServices] IPlaceOrderHandler placeOrderHandler) =>
             {
-                var forecast = Enumerable.Range(1, 5).Select(index =>
-                        new WeatherForecast
-                        {
-                            Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                            TemperatureC = Random.Shared.Next(-20, 55),
-                            Summary = summaries[Random.Shared.Next(summaries.Length)]
-                        })
-                    .ToArray();
-                return forecast;
+                placeOrderHandler.Handle(command);
             })
-            .WithName("GetWeatherForecast")
+            .WithName("PlaceOrder")
             .WithOpenApi();
 
         app.Run();
