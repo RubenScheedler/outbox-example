@@ -5,6 +5,7 @@ using outbox_sample.Messaging;
 using outbox_sample.Messaging.Abstraction;
 using outbox_sample.Orders;
 using outbox_sample.Orders.Abstraction;
+using outbox_sample.Outbox;
 using outbox_sample.Outbox.Abstraction;
 
 namespace outbox_sample;
@@ -32,6 +33,8 @@ public class Program
         builder.Services.AddScoped<IMessageBroker, MessageBroker>();
         builder.Services.AddScoped<IOutbox, Outbox.Outbox>();
         builder.Services.AddScoped<IPlaceOrderHandler, PlaceOrderHandler>();
+        builder.Services.AddHostedService<OutboxProcessor>();
+        
         var app = builder.Build();
 
         using (var scope = app.Services.CreateScope())
